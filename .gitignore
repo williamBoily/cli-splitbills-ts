@@ -1,3 +1,5 @@
-node_modules/
-
 .env
+credit_card_transactions/*
+node_modules/
+*.code-workspace
+.DS_Store
