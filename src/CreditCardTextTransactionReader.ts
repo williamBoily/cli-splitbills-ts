@@ -2,16 +2,29 @@ import { Transaction } from './Transaction';
 import * as fs from 'fs';
 import * as readline from 'readline';
 import { once } from 'events';
+import { DateTime } from 'luxon';
 
 export class CreditCardTextTransactionReader {
-	// private readlineInstance: readline.Interface;
+	private readonly DATE_FORMAT = 'dd MMM yyyy';
+
 	private transactionListHasStarted = false;
-	private transactionListHasEnded = false;
+
+	private rawTextTransactionLine: string[] = [];
+	private transactions: Transaction[] = [];
+
 	constructor(private textFilePath: string) {
 	
 	}
 
 	public async read(): Promise<Transaction[]> {
+		await this.extractRawTextTransactions();
+		this.buildTransactionList();
+		this.orderTransactionFromOldest1st()
+
+		return this.transactions;
+	}
+
+	private async extractRawTextTransactions(): Promise<void> {
 		const fileStream = fs.createReadStream(this.textFilePath);
 	
 		const rl = readline.createInterface({
@@ -21,47 +34,69 @@ export class CreditCardTextTransactionReader {
 
 		// assume line are process in order. might not be true
 		rl.on('line', (line) => {
-			let prefix = 'PRE  TXN: ';
-			if(this.transactionListHasStarted){
-				prefix = 'IS   TXN(+1): ';
-			}
-			if(this.transactionListHasEnded){
-				prefix = 'POST TXN(-1): ';
-			}
-			console.log(prefix + line);
-
 			if(!this.transactionListHasStarted && line.startsWith('Transaction date')){
 				this.transactionListHasStarted = true;
+				return;
 			}
 
 			if(this.transactionListHasStarted && line.startsWith('Total')){
-				this.transactionListHasEnded = true;
+				rl.removeAllListeners('line');
+
+				// rl.close();
+				/**
+				 * rl.close(); does not work. it is mostlikely because the stream has already read the rest of the file
+				 * so closing it doest not clear the buffer and the event on 'line' still get exceuted with what is in the buffer.
+				 * 
+				 * Working alternative solution was to have a boolean flag and ignore the rest of the line when no more transactions.
+				 * 
+				 */
+				return;
+			}
+
+			if(this.transactionListHasStarted){
+				this.rawTextTransactionLine.push(line);
 			}
 		});
 
-		rl.on('close', (input: any) => {
-			console.log(`Received close: ${input}`);
-		});
-
 		await once(rl, 'close');
-		// Note: we use the crlfDelay option to recognize all instances of CR LF
-		// ('\r\n') in input.txt as a single line break.
-		// await this.readFileUntilTransactionsListStarts();
-		// for await (const line of this.readlineInstance) {
-		// 	console.log(line);
-		// }
-		const transactions: Transaction[] = [];
-
-		return transactions;
 	}
 
-	// private async readFileUntilTransactionsListStarts(){
-	// 	for await (const line of this.readlineInstance) {
-	// 		if(line.startsWith('Transaction date')){
-	// 			console.log('setting pause');
-	// 			this.readlineInstance.pause();
-	// 			break;
-	// 		}
-	// 	}
-	// }
+	private buildTransactionList(){
+		this.rawTextTransactionLine.forEach(line => {
+			const parts = line.split("\t").filter(substring => {
+				return substring.length > 0;
+			});
+		
+			const transaction = this.buildTransaction(parts);
+			this.transactions.push(transaction);
+			// dd day of the month, padded to 2 => 06
+			// MMM month as an abbreviated localized string => Aug
+			// the month value is all cap but the match is case insensitive
+			// DateTime.fromFormatExplain(parts[0], "dd MMM yyyy")
+		});
+	}
+
+	private buildTransaction(rawData: string[]): Transaction {
+		const txnDate = DateTime.fromFormat(rawData[0], this.DATE_FORMAT).toJSDate();
+		const amount = this.parseMoneyAmount(rawData[4]);
+		const description = rawData[3];
+		return new Transaction(txnDate, amount, description);
+	}
+
+	private parseMoneyAmount(stringAmount: string): number {
+		// remove all non digit, including dot(.), decimal seprarator
+		// don't take the chance of finding space, comma, etc
+		stringAmount = stringAmount.replace(/\D/g,'');
+		const dollar = stringAmount.substring(0, stringAmount.length - 2);
+		const cents = stringAmount.slice(-2);
+
+		return parseFloat(`${dollar}.${cents}`);
+	}
+
+	private orderTransactionFromOldest1st(): void {
+		this.transactions.sort((a, b) => {
+			// ascending order by ts.
+			return a.date.valueOf() - b.date.valueOf()
+		});
+	}
 }
