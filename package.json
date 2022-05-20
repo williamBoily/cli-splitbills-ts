@@ -18,13 +18,13 @@
   },
   "homepage": "https://github.com/williamBoily/cli-splitbills-ts#readme",
   "devDependencies": {
+    "@types/pdf-parse": "^1.1.1",
     "ts-node": "^10.7.0",
     "typescript": "^4.6.4"
   },
   "dependencies": {
     "@types/luxon": "^2.3.2",
     "luxon": "^2.4.0",
-    "pdf-parse": "^1.1.1",
-    "pdfreader": "^2.0.0"
+    "pdf-parse": "^1.1.1"
   }
 }
