@@ -5,7 +5,8 @@ import { once } from 'events';
 import { DateTime } from 'luxon';
 import { TransactionReader } from './TransactionReader.interface';
 
-export class CreditCardTextTransactionReader implements TransactionReader {
+// from printable version
+export class PersonalChequingAccountTextTransactionReader implements TransactionReader {
 	private readonly DATE_FORMAT = 'dd MMM yyyy';
 
 	private transactionListHasStarted = false;
@@ -34,13 +35,13 @@ export class CreditCardTextTransactionReader implements TransactionReader {
 		});
 
 		// assume line are process in order. might not be true
-		rl.on('line', (line) => {
-			if(!this.transactionListHasStarted && line.startsWith('Transaction date')){
+		rl.on('line', (line) => {	
+			if(!this.transactionListHasStarted && line.startsWith('Date   	Description')){
 				this.transactionListHasStarted = true;
 				return;
 			}
 
-			if(this.transactionListHasStarted && line.startsWith('Total')){
+			if(this.transactionListHasStarted && line.length === 0){
 				rl.removeAllListeners('line');
 
 				// rl.close();
@@ -64,9 +65,11 @@ export class CreditCardTextTransactionReader implements TransactionReader {
 
 	private buildTransactionList(){
 		this.rawTextTransactionLine.forEach(line => {
-			const parts = line.split("\t").filter(substring => {
-				return substring.length > 0;
-			});
+			const parts = line.split("\t");
+			// parts[2] is withdrawal
+			if(parts[2] === ''){
+				return;
+			}
 		
 			const transaction = this.buildTransaction(parts);
 			this.transactions.push(transaction);
@@ -79,19 +82,15 @@ export class CreditCardTextTransactionReader implements TransactionReader {
 
 	private buildTransaction(rawData: string[]): Transaction {
 		const txnDate = DateTime.fromFormat(rawData[0], this.DATE_FORMAT).toJSDate();
-		const amount = this.parseMoneyAmount(rawData[4]);
-		const description = rawData[3];
+		const amount = this.parseMoneyAmountInCents(rawData[2]);
+		const description = rawData[1];
 		return new Transaction(txnDate, amount, description);
 	}
 
-	private parseMoneyAmount(stringAmount: string): number {
-		// remove all non digit, including dot(.), decimal seprarator
-		// don't take the chance of finding space, comma, etc
-		stringAmount = stringAmount.replace(/\D/g,'');
-		const dollar = stringAmount.substring(0, stringAmount.length - 2);
-		const cents = stringAmount.slice(-2);
-
-		return parseFloat(`${dollar}.${cents}`);
+	private parseMoneyAmountInCents(stringAmount: string): number {
+		// remove any non digit
+		stringAmount = stringAmount.replace(/\D/g, '');
+		return parseInt(stringAmount);
 	}
 
 	private orderTransactionFromOldest1st(): void {

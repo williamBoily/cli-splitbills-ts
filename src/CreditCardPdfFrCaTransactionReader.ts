@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import { DateTime } from 'luxon';
 import PdfParse from 'pdf-parse';
 import { Transaction } from './Transaction';
+import { TransactionReader } from './TransactionReader.interface';
 
 interface RegMatchesFromTxnLine {
 	dates: string;
@@ -9,7 +10,7 @@ interface RegMatchesFromTxnLine {
 	amount: string;
 }
 
-export class CreditCardPdfFrCaTransactionReader {
+export class CreditCardPdfFrCaTransactionReader implements TransactionReader {
 	private rawTextTransactionLine: string[] = [];
 	private transactions: Transaction[] = [];
 	private totalFromFile = 0;
@@ -51,7 +52,7 @@ export class CreditCardPdfFrCaTransactionReader {
 
 		// console.log(pdfData.text);
 
-		const regTotalLine = new RegExp(/^TOTAL\d+,\d{2}$/);
+		const regTotalLine = new RegExp(/^TOTAL\d{1}.*,\d{2}$/);
 		this.rawTextTransactionLine = pdfData.text.split("\n").filter(line => {
 			if(regTotalLine.test(line)){
 				this.totalFromFile = this.parseMoneyAmountInCents(line);
@@ -150,7 +151,7 @@ export class CreditCardPdfFrCaTransactionReader {
 		}, initialValue);
 
 		if(totalFromTxn !== this.totalFromFile){
-			throw new Error(`Miss match between Total from Transactions(${totalFromTxn}) found and from the File(${this.totalFromFile}).`);
+			throw new Error(`Miss match between Total from Transactions(${totalFromTxn}) found and from the File(${this.totalFromFile}). ${this.textFilePath}`);
 		}
 	}
 }
