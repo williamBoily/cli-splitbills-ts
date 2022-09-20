@@ -5,7 +5,7 @@ import { once } from 'events';
 import { DateTime } from 'luxon';
 import { TransactionReader } from './TransactionReader.interface';
 
-export class CreditCardTextTransactionReader implements TransactionReader {
+export class CreditCardTextReconciliationTransactionReader implements TransactionReader {
 	private readonly DATE_FORMAT = 'dd MMM yyyy';
 
 	private transactionListHasStarted = false;
@@ -40,7 +40,8 @@ export class CreditCardTextTransactionReader implements TransactionReader {
 				return;
 			}
 
-			if(this.transactionListHasStarted && line.startsWith('Total')){
+			// first empty line
+			if(this.transactionListHasStarted && line.length === 0){
 				rl.removeAllListeners('line');
 
 				// rl.close();
@@ -79,8 +80,8 @@ export class CreditCardTextTransactionReader implements TransactionReader {
 
 	private buildTransaction(rawData: string[]): Transaction {
 		const txnDate = DateTime.fromFormat(rawData[0], this.DATE_FORMAT).toJSDate();
-		const amount = this.parseMoneyAmount(rawData[4]);
-		const description = rawData[3];
+		const amount = this.parseMoneyAmount(rawData[3]);
+		const description = rawData[2];
 		return new Transaction(txnDate, amount, description);
 	}
 
@@ -96,6 +97,7 @@ export class CreditCardTextTransactionReader implements TransactionReader {
 		stringAmount = stringAmount.replace(/\D/g, '');
 		// const dollar = stringAmount.substring(0, stringAmount.length - 2);
 		// const cents = stringAmount.slice(-2);
+
 
 		return parseInt(`${sign}${stringAmount}`);
 	}

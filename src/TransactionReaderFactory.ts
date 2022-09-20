@@ -1,6 +1,7 @@
 import { PersonalChequingAccountTextTransactionReader } from './PersonalChequingAccountTextTransactionReader';
 import { CreditCardPdfFrCaTransactionReader } from './CreditCardPdfFrCaTransactionReader';
 import { CreditCardTextTransactionReader } from './CreditCardTextTransactionReader';
+import { CreditCardTextReconciliationTransactionReader } from './CreditCardTextReconciliationTransactionReader';
 import { TransactionReader } from './TransactionReader.interface';
 import * as path from 'path';
 
@@ -12,12 +13,17 @@ export class TransactionReaderFactory {
 		}
 		
 		if (fileName.endsWith('.pdf')) {
-			console.log('cc pdf reader');
+			console.log('cc pdf statement reader');
 			return new CreditCardPdfFrCaTransactionReader(fileName);
 		}
 
+		if (path.basename(fileName).startsWith('Reconciliation') && fileName.endsWith('.txt')) {
+			console.log('cc Reconciliation text reader');
+			return new CreditCardTextReconciliationTransactionReader(fileName);
+		}
+
 		if (fileName.endsWith('.txt')) {
-			console.log('cc text reader');
+			console.log('cc text statement reader');
 			return new CreditCardTextTransactionReader(fileName);
 		}
 
